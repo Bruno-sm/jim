@@ -1,7 +1,7 @@
 -module(jim_utils).
 
--export([type_of/1, entry_to_record/1, password/1, password/2,
-		 match_password/2, primarykey_value/2,
+-export([type_of/1, entry_to_record/1, record_to_entry/1, 
+	     password/1, password/2, match_password/2, primarykey_value/2,
 		 to_string/1]).
 
 
@@ -26,8 +26,13 @@ entry_to_record({TableName, Attributes}) ->
 	RecordList = [TableName | AttributesList],
 	list_to_tuple(RecordList).
 
+record_to_entry(Record) ->
+	LRecord = tuple_to_list(Record),
+	[_TableName | LEntry] = LRecord,
+	list_to_tuple(LEntry).
+
 password(TableName, PrimaryKeyValue) ->
-	Entry = jim_database:search(TableName, {jim_database_data:primary_key(TableName), PrimaryKeyValue}),
+	Entry = jim_database:primary_search(TableName, PrimaryKeyValue),
 	password(Entry).
 password(Entry) ->
 	LEntry = tuple_to_list(Entry),

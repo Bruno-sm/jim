@@ -2,8 +2,8 @@
 
 -export([tables/0, table_names/0, fields/1, field_position/2,
 		 field_type/2, get_table_by_name/1, primary_key/1]).
-%% This module is thougth to be automatic generated from jim_database_info.erl
-%% , the content is only for testing prouposes
+%% This module is thougth to be automatic generated from jim_database_info.erl,
+%% the content is only for testing prouposes
 
 tables() -> [
 			 {object, {direction, location, metadata, password}},
@@ -16,7 +16,7 @@ fields(object) -> [direction, location, metadata, password];
 fields(user) -> [id, name, sex, password].
 
 field_position(object, direction) -> 1;
-field_position(object, locationn) -> 2;
+field_position(object, location) -> 2;
 field_position(object, metadata) -> 3;
 field_position(object, password) -> 4;
 field_position(user, id) -> 1;

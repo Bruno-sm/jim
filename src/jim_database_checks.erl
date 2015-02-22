@@ -17,7 +17,7 @@ correct_search(TableName, {Field, Value}) ->
 	end.
 
 correct_delete(TableName, PrimaryKeyValue) ->
-	case jim_database_checks:exist_table(TableName) of
+	case exist_table(TableName) of
 		true -> case exist_entry(TableName, PrimaryKeyValue) of
 					true -> true;
 					{false, _Reason} -> {error, "doesn't exist the entry"}
