@@ -12,12 +12,25 @@
 
 -export([add/1, delete/3, modify/3, search/2, primary_search/2]).
 
+%% @type entry() = {tablename(), {Attributes}}
+%% @type tablename() = atom()
+%% @type password() = string()
+%% @type field() = atom()
+%% @type result() = {Attributes}
+%% @type results() = [result]
 
+
+%% @spec init_database() -> ok | {error, Error}
 init_database() ->
-	mnesia:create_schema([node()]),
-	mnesia:start(),
-	Tables = jim_database_data:tables(),
-	init_tables(Tables).
+	try
+		mnesia:create_schema([node()]),
+		mnesia:start(),
+		Tables = jim_database_data:tables(),
+		init_tables(Tables),
+		ok
+	catch
+		_C:E -> {error, E}
+	end.
 
 init_tables([]) -> ok;
 init_tables([Table | T]) ->
@@ -29,6 +42,8 @@ init_table(Table) ->
 	LFields = tuple_to_list(Fields),
 	mnesia:create_table(TableName, [{attributes, LFields}]).
 
+%% @spec add(entries()) -> ok | {error, Reason}
+%% @type entries() = [entry()]
 add([]) -> ok;
 add([{TableName, Attributes}|T]) ->
 	add({TableName, Attributes}),
@@ -41,6 +56,7 @@ add({TableName, Attributes}) ->
 		{false, Reason} -> {error, ["bad entry", Reason]}
 	end.	
 
+%% @spec delete(tablename(), PrimaryKeyValue::any(), password()) -> ok | {error, Reason}
 delete(TableName, PrimaryKeyValue, Password) ->
 	case jim_database_checks:correct_delete(TableName, PrimaryKeyValue) of
 		true -> delete_(TableName, PrimaryKeyValue, Password);
@@ -58,8 +74,15 @@ delete_(TableName, PrimaryKeyValue) ->
 	Delete = fun() ->
 				  mnesia:delete({TableName, PrimaryKeyValue})
 			 end,
-	mnesia:transaction(Delete).
+	case mnesia:transaction(Delete) of
+		{atomic, ok} -> ok;
+		Any -> {error, Any}
+	end.
 
+%% @spec modify(objective(), modifications(), password()) -> ok | {error, Reason}
+%% @type objective() = {tablename(), PrimaryKeyValue}
+%% @type modifications() = [modification()]
+%% @type modification() = {field(), NewValue}
 modify(Objective, Modifications, Password) ->
 	case jim_database_checks:correct_modify(Objective, Modifications) of
 		true -> modify_(Objective, Modifications, Password);
@@ -81,7 +104,10 @@ modify_({TableName, PrimaryKeyValue}, [Modifications]) ->
 				mnesia:delete({TableName, PrimaryKeyValue}),
 				mnesia:write(ModificatedRecord)
 			 end,
-	mnesia:transaction(Replace).
+	case mnesia:transaction(Replace) of
+		{atomic, ok} -> ok;
+		Any -> {error, Any}
+	end.
 
 modify_entry(_TableName, OriginalEntry, []) -> OriginalEntry;
 modify_entry(TableName, OriginalEntry, [Modification | T]) ->
@@ -90,12 +116,14 @@ modify_entry(TableName, OriginalEntry, [Modification | T]) ->
 	ModificatedEntry = setelement(ModificationPosition, OriginalEntry, NewValue),
 	modify_entry(TableName, ModificatedEntry, T).
 
+%% @spec primary_search(tablename(), PrimaryKeyValue) -> results() | {error, Reason}
 primary_search(TableName, PrimaryKeyValue) ->
 	case search(TableName, {jim_database_data:primary_key(TableName), PrimaryKeyValue}) of
 		[Entry] -> Entry;
 		[] -> []
 	end.
 
+%% @spec search(tablename(), {field(), Value}) -> results() | {error, Reason}
 search(TableName, {Field, Value}) ->
 	case jim_database_checks:correct_search(TableName, {Field, Value}) of
 		true -> search_(TableName, {Field, Value});
@@ -108,5 +136,7 @@ search_(TableName, {Field, Value}) ->
 						        element(FieldPosition, Record) == Value]),
 					 qlc:e(Q)
 			end,
-	{atomic, Results} = mnesia:transaction(Query),
-	Results.
+	case mnesia:transaction(Query) of
+		{atomic, Results} -> Results;
+		Any -> {error, Any}
+	end.
