@@ -2,20 +2,29 @@
 
 -export([correct_entry/1, correct_delete/2, correct_search/2, correct_modify/2]).
 
+%% @type entry() = {tablename(), {Attributes}}
+%% @type tablename() = atom()
+%% @type field() = atom()
+%% @type objective() = {tablename(), PrimaryKeyValue}
+%% @type modifications() = [modification()]
+%% @type modification() = {field(), NewValue}
 
 
+%% @spec correct_entry(entry()) -> true | {false, Reason}
 correct_entry({TableName, Attributes}) ->
 	case exist_table(TableName) of
     	true -> correct_attributes(TableName, Attributes);
 		{false, _Reason} -> {false, "doesn't exist the table"}
 	end.
 
+%% @spec correct_search(tablename(), {field(), Value}) -> true | {false, Reason}
 correct_search(TableName, {Field, Value}) ->
 	case exist_table(TableName) of
 		true -> correct_pair_field_value(TableName, {Field, Value});
 		{false, _Reason} -> {false, "doesn't exist the table"}
 	end.
 
+%% @spec correct_delete(tablename(), PrimaryKeyValue) -> true | {false, Reason}
 correct_delete(TableName, PrimaryKeyValue) ->
 	case exist_table(TableName) of
 		true -> case exist_entry(TableName, PrimaryKeyValue) of
@@ -25,6 +34,7 @@ correct_delete(TableName, PrimaryKeyValue) ->
 		{false, _Reason} -> {error, "doesn't exist the table"}
 	end.
 
+%% @spec correct_modify(objective(), modifications()) -> true | {false, Reason}
 correct_modify(_Objective, []) -> true;
 correct_modify(Objective, [Modification | T]) ->
 	case correct_modification(Objective, Modification) of
