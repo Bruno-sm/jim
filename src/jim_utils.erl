@@ -1,13 +1,12 @@
 -module(jim_utils).
 
 -export([type_of/1, entry_to_record/1, record_to_entry/1, 
-	     password/1, password/2, match_password/2, primarykey_value/2,
+	     match_password/2, primarykey_value/2,
 		 to_string/1]).
 
 %% @type record() = {tablename(), Attributes}
 %% @type entry() = {tablename(), {Attributes}}
 %% @type tablename() = atom()
-%% @type password() = string()
 
 
 %% @spec type_of(any()) -> Type::atom()
@@ -38,26 +37,15 @@ record_to_entry(Record) ->
 	[_TableName | LEntry] = LRecord,
 	list_to_tuple(LEntry).
 
-%% @spec password(tablename(), PrimaryKeyValue) -> password()
-password(TableName, PrimaryKeyValue) ->
-	Entry = jim_database:primary_search(TableName, PrimaryKeyValue),
-	password(Entry).
-
-%% @spec password(entry()) -> password()
-password(Entry) ->
-	LEntry = tuple_to_list(Entry),
-	Password = lists:last(LEntry),
-	Password.
-
 %% @spec match_password(password(), password()) -> true | false
 match_password(Password, RealPassword) ->
 	Password == RealPassword.
 
-%% @spec primarykey_value(tablename(), entry()) -> PrimaryKeyValue
-primarykey_value(TableName, Entry) ->
+%% @spec primarykey_value(tablename(), {Attributes}) -> PrimaryKeyValue
+primarykey_value(TableName, Attributes) ->
 	PrimaryKey = jim_database_data:primary_key(TableName),
 	ValuePosition = jim_database_data:field_position(TableName, PrimaryKey),
-	element(ValuePosition, Entry).
+	element(ValuePosition, Attributes).
 
 %% @spec to_string(any()) -> string()
 to_string(Term) ->

@@ -1,6 +1,6 @@
 -module(jim_database_checks).
 
--export([correct_entry/1, correct_delete/2, correct_search/2, correct_modify/2]).
+-export([correct_addition/2, correct_delete/2, correct_search/2, correct_modify/2]).
 
 %% @type entry() = {tablename(), {Attributes}}
 %% @type tablename() = atom()
@@ -8,13 +8,14 @@
 %% @type objective() = {tablename(), PrimaryKeyValue}
 %% @type modifications() = [modification()]
 %% @type modification() = {field(), NewValue}
+%% @type password() = string()
 
 
-%% @spec correct_entry(entry()) -> true | {false, Reason}
-correct_entry({TableName, Attributes}) ->
-	case exist_table(TableName) of
-    	true -> correct_attributes(TableName, Attributes);
-		{false, _Reason} -> {false, "doesn't exist the table"}
+%% @spec correct_addition(entry(), password()) -> true | {false, Reason}
+correct_addition(Entry, Password) ->
+	case correct_entry(Entry) of
+		true -> correct_password(Password);
+		{false, Reason} -> {false, Reason}
 	end.
 
 %% @spec correct_search(tablename(), {field(), Value}) -> true | {false, Reason}
@@ -58,6 +59,12 @@ exist_entry(TableName, PrimaryKeyValue) ->
 		_ -> true
 	end.
 
+correct_entry({TableName, Attributes}) ->
+	case exist_table(TableName) of
+    	true -> correct_attributes(TableName, Attributes);
+		{false, _Reason} -> {false, "doesn't exist the table"}
+	end.
+
 correct_attributes(TableName, Attributes) ->
 	case correct_attributes_number(TableName, Attributes) of
 		true -> correct_attributes_type(TableName, Attributes);
@@ -96,6 +103,12 @@ correct_pair_field_value(TableName, {Field, Value}) ->
 	case field_in_table(TableName, Field) of
 		true -> match_field_value_types(TableName, {Field, Value});
 		{false, _Reason} -> {false, "donesn't exist the field"}
+	end.
+
+correct_password(Password) ->
+	case jim_utils:type_of(Password) == list of
+		true -> true;
+		false -> {false, "Incorrect password type"}
 	end.
 
 field_in_table(TableName, Field) ->

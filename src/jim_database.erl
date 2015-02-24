@@ -13,6 +13,7 @@
 -export([add/1, delete/3, modify/3, search/2, primary_search/2]).
 
 %% @type entry() = {tablename(), {Attributes}}
+%% @type record() = {tablename(), Attributes}
 %% @type tablename() = atom()
 %% @type password() = string()
 %% @type field() = atom()
@@ -27,6 +28,7 @@ init_database() ->
 		mnesia:start(),
 		Tables = jim_database_data:tables(),
 		init_tables(Tables),
+		init_password_table(),
 		ok
 	catch
 		_C:E -> {error, E}
@@ -42,19 +44,36 @@ init_table(Table) ->
 	LFields = tuple_to_list(Fields),
 	mnesia:create_table(TableName, [{attributes, LFields}]).
 
-%% @spec add(entries()) -> ok | {error, Reason}
-%% @type entries() = [entry()]
+init_password_table() ->
+	mnesia:create_table(password, [{attributes, [objective, password]}]).
+
+%% @spec add(additions()) -> ok | {error, Reason}
+%% @type additions() = [addition()]
+%% @type addition() = {tablename(), {Attributes}, password()}
 add([]) -> ok;
-add([{TableName, Attributes}|T]) ->
-	add({TableName, Attributes}),
+add([Addition|T]) ->
+	add(Addition),
 	add(T);
-add({TableName, Attributes}) ->
-	case jim_database_checks:correct_entry({TableName, Attributes}) of
-		true -> Record = jim_utils:entry_to_record({TableName, Attributes}),
-				Add = fun() -> mnesia:write(Record) end,
+add({TableName, Attributes, Password}) ->
+	Entry = {TableName, Attributes},
+	case jim_database_checks:correct_addition(Entry, Password) of
+		true -> Add = fun() -> 
+						   add_entry(Entry),
+						   link_password(Entry, Password)
+					  end,
 				mnesia:transaction(Add);
 		{false, Reason} -> {error, ["bad entry", Reason]}
-	end.	
+	end.
+
+add_entry(Entry) ->
+	Record = jim_utils:entry_to_record(Entry),
+	mnesia:write(Record).
+
+link_password(Entry, Password) ->
+	{TableName, Attributes} = Entry,
+	PrimaryKeyValue = jim_utils:primarykey_value(TableName, Attributes),
+	Record = jim_utils:entry_to_record({password, {{TableName, PrimaryKeyValue}, Password}}),
+	mnesia:write(Record).
 
 %% @spec delete(tablename(), PrimaryKeyValue::any(), password()) -> ok | {error, Reason}
 delete(TableName, PrimaryKeyValue, Password) ->
@@ -64,7 +83,7 @@ delete(TableName, PrimaryKeyValue, Password) ->
 	end.
 
 delete_(TableName, PrimaryKeyValue, Password) ->
-	RealPassword = jim_utils:password(TableName, PrimaryKeyValue),
+	RealPassword = password(TableName, PrimaryKeyValue),
 	case jim_utils:match_password(Password, RealPassword) of
 		true -> delete_(TableName, PrimaryKeyValue);
 		false -> {error, "bad_password"}
@@ -90,7 +109,7 @@ modify(Objective, Modifications, Password) ->
 	end.
 
 modify_({TableName, PrimaryKeyValue}, Modifications, Password) ->
-	RealPassword = jim_utils:password(TableName, PrimaryKeyValue),
+	RealPassword = password(TableName, PrimaryKeyValue),
 	case jim_utils:match_password(Password, RealPassword) of
 		true -> modify_({TableName, PrimaryKeyValue}, Modifications);
 		false -> {error, "incorrect password"}
@@ -138,5 +157,23 @@ search_(TableName, {Field, Value}) ->
 			end,
 	case mnesia:transaction(Query) of
 		{atomic, Results} -> Results;
+		Any -> {error, Any}
+	end.
+
+%% @spec password(record()) -> password()
+password(Record) ->
+	{TableName, Attributes} = Record,
+	PrimaryKeyValue = jim_utils:primarykey_value(TableName, Attributes),
+	password(TableName, PrimaryKeyValue).
+
+%% @spec password(tablename(), PrimaryKeyValue) -> password()
+password(TableName, PrimaryKeyValue) ->
+	Objective = {TableName, PrimaryKeyValue},
+	Query = fun() -> Q = qlc:q([jim_utils:record_to_entry(Record) || Record <- mnesia:table(password),
+						        element(2, Record) == Objective]),
+					 qlc:e(Q)
+			end,
+	case mnesia:transaction(Query) of
+		{atomic, [{_Objective, Password}]} -> Password;
 		Any -> {error, Any}
 	end.
